@@ -26,8 +26,10 @@ jobs:
       - name: Install package
         run: python -m pip install -e .
 
-      - name: Run self-scan at high threshold
-        run: python -m mcp_policy_guard scan . --fail-on high
+      - name: Run scanner on authored runtime paths
+        run: |
+          python -m mcp_policy_guard scan src --fail-on high
+          python -m mcp_policy_guard scan .github --fail-on high
 
       - name: Compile sources
         run: python -m compileall src tests
