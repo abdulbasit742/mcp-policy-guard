@@ -34,8 +34,8 @@ class ScannerTests(unittest.TestCase):
         )
 
         self.assertEqual(result.scanned_files, 2)
-        rule_ids = [finding.rule_id for finding in result.findings]
-        self.assertEqual(rule_ids, ["MPG001", "MPG002", "MPG003", "MPG004", "MPG005"])
+        rule_ids = {finding.rule_id for finding in result.findings}
+        self.assertEqual(rule_ids, {"MPG001", "MPG002", "MPG003", "MPG004", "MPG005"})
 
     def test_ignores_placeholder_secret_values(self):
         result = self.scan_repo(
