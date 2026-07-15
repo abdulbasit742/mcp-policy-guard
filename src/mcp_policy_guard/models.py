@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from hashlib import sha256
 from typing import Iterable
 
 SEVERITY_ORDER = {
@@ -23,8 +24,15 @@ class Finding:
     evidence: str
     recommendation: str
 
+    @property
+    def fingerprint(self) -> str:
+        payload = "\0".join(
+            (self.rule_id, self.file_path, self.evidence.strip())
+        ).encode("utf-8")
+        return f"sha256:{sha256(payload).hexdigest()}"
+
     def to_dict(self) -> dict[str, object]:
-        return asdict(self)
+        return {**asdict(self), "fingerprint": self.fingerprint}
 
 
 @dataclass(frozen=True)
