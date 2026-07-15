@@ -2,43 +2,51 @@
 
 ## Scope
 
-These instructions apply to the entire `abdulbasit742/mcp-policy-guard` repository. More specific AGENTS.md or AGENTS.override.md files in subdirectories may refine them.
+These instructions apply to the entire `abdulbasit742/mcp-policy-guard` repository.
 
-Project: **MCP Policy Guard**.
+Project: **MCP Policy Guard**, a stdlib-only Python scanner with governed suppressions and SARIF output.
 
-Detected root stack: **Python project configured by pyproject.toml**.
+## Architecture
+
+- `src/mcp_policy_guard/scanner.py`: read-only text scanning and stable rules
+- `src/mcp_policy_guard/models.py`: finding model, severity ordering, fingerprints
+- `src/mcp_policy_guard/policy.py`: strict suppression schema and matching
+- `src/mcp_policy_guard/sarif.py`: SARIF 2.1.0 serialization
+- `src/mcp_policy_guard/cli.py`: commands, output formats, and exit codes
+- `tests/`: scanner, policy, CLI, and SARIF regression coverage
 
 ## Working method
 
-1. Read README.md, the relevant manifests, and nearby tests before editing.
-2. Check the current diff and preserve unrelated user changes.
-3. Make the smallest coherent change that solves the task; follow existing names, patterns, and directory boundaries.
-4. Do not hand-edit generated, vendored, dependency, build-output, model-weight, or dataset files unless the task explicitly targets them.
-5. Update tests and documentation when behavior, configuration, public APIs, or setup steps change.
-
-## Commands
-
-- Create an isolated environment: `python -m venv .venv`.
-- Install the project with `python -m pip install -e .` unless pyproject.toml documents a different workflow.
-- Treat pyproject.toml and the README as the source of truth for tool-specific commands.
+1. Read `README.md`, `docs/security-audit.md`, nearby tests, and the relevant module before editing.
+2. Keep runtime dependencies at zero unless a separately reviewed accuracy requirement clearly justifies one.
+3. Never execute, import, or make network requests based on scanned repository content.
+4. Keep rule IDs stable. Update rule metadata, tests, README, and SARIF behavior together when adding or changing a rule.
+5. Treat policy parsing as an untrusted-input boundary: preserve size/count caps, exact fields, path safety, expiry, and duplicate rejection.
+6. Do not weaken suppression matching from exact rule + path + fingerprint or remove owner/reason/expiry requirements.
+7. Preserve exit semantics: `0` success/below threshold, `1` active finding threshold, `2` policy/governance failure.
 
 ## Verification
 
-- Run the narrowest relevant test first, then the repository's available lint, type-check, test, and build commands.
-- Never report a check as passed unless it was actually run. State skipped checks and the concrete reason.
-- For UI changes, verify loading, empty, error, and success states plus keyboard access and responsive layout.
-- For API or persistence changes, verify validation, authorization, failure behavior, and backward compatibility.
+```bash
+python -m pip install -e .
+python -m compileall -q src tests
+python -m unittest discover -s tests -v
+python -m mcp_policy_guard policy validate .mcp-policy-guard.example.json
+python -m mcp_policy_guard scan . --fail-on critical
+python -m mcp_policy_guard scan . --format sarif --fail-on critical > report.sarif
+```
 
-## Security and side effects
+## Security requirements
 
-- Never commit secrets, tokens, passwords, private keys, production data, or populated environment files. Use documented environment variables and sanitized examples.
-- Treat migrations, deployments, billing, live network calls, account changes, destructive Git operations, and external messages as side effects. Do not perform them without explicit task authorization.
-- Validate untrusted input at trust boundaries and avoid logging credentials, personal data, prompts containing secrets, or raw third-party payloads.
-- AI/model integrations: keep provider credentials server-side, validate model output before side effects, use bounded retries/timeouts, and retain a deterministic non-AI failure path.
+- Never commit real credentials or suppression evidence containing private data.
+- Suppressions must be narrow, accountable, time-bounded, and visible in JSON audit output.
+- Active findings only appear as SARIF results; suppression counts must remain visible in run metadata.
+- Never add inline ignore comments or rule-wide disable switches that bypass repository policy review.
+- Do not silently skip malformed policy, expired entries, stale strict-policy entries, or unknown fields.
 
 ## Completion checklist
 
-- The requested behavior is implemented with a focused diff.
-- Relevant automated checks pass, or any unavailable checks are clearly identified.
-- No secrets, generated artifacts, or unrelated formatting churn were introduced.
-- The final handoff summarizes changed files, verification evidence, risks, and any follow-up work.
+- Relevant tests, compile, policy validation, scanner smoke test, and SARIF parsing pass.
+- Documentation and skill registry reflect changed public behavior.
+- No network, mutation, shell execution, or new runtime dependency was introduced.
+- Residual heuristic and suppression risks remain documented.
