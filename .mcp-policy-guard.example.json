@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "suppressions": [
+    {
+      "rule_id": "MPG002",
+      "path": "tests/fixtures/local_server.py",
+      "fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "owner": "security-team",
+      "reason": "Example only: reviewed local-only fixture with no network exposure",
+      "expires_on": "2099-12-31"
+    }
+  ]
+}
