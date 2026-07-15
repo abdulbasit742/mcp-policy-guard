@@ -16,7 +16,13 @@ TEXT_SUFFIXES = {
     ".yaml",
     ".yml",
     ".js",
+    ".jsx",
+    ".mjs",
     ".ts",
+    ".tsx",
+    ".sh",
+    ".ini",
+    ".cfg",
 }
 SKIP_DIR_NAMES = {
     ".git",
@@ -55,7 +61,6 @@ PLACEHOLDER_HINTS = (
     "dummy",
     "sample",
 )
-
 
 RULES = (
     {
@@ -105,12 +110,13 @@ def scan_path(target: str | Path) -> ScanResult:
     root = Path(target).expanduser().resolve()
     findings: list[Finding] = []
     scanned_files = 0
-
     for file_path in iter_text_files(root):
         scanned_files += 1
         findings.extend(scan_file(file_path, root))
-
-    return ScanResult(scanned_files=scanned_files, findings=tuple(sort_findings(findings)))
+    return ScanResult(
+        scanned_files=scanned_files,
+        findings=tuple(sort_findings(findings)),
+    )
 
 
 def iter_text_files(root: Path) -> Iterable[Path]:
@@ -118,11 +124,10 @@ def iter_text_files(root: Path) -> Iterable[Path]:
         if should_scan(root):
             yield root
         return
-
     for file_path in root.rglob("*"):
-        if file_path.is_dir():
-            continue
-        if any(part in SKIP_DIR_NAMES for part in file_path.parts):
+        if file_path.is_dir() or any(
+            part in SKIP_DIR_NAMES for part in file_path.parts
+        ):
             continue
         if should_scan(file_path):
             yield file_path
@@ -134,11 +139,9 @@ def should_scan(file_path: Path) -> bool:
     if file_path.suffix.lower() not in TEXT_SUFFIXES and file_path.name != ".env":
         return False
     try:
-        if file_path.stat().st_size > MAX_FILE_BYTES:
-            return False
+        return file_path.stat().st_size <= MAX_FILE_BYTES
     except OSError:
         return False
-    return True
 
 
 def scan_file(file_path: Path, root: Path) -> list[Finding]:
@@ -147,9 +150,8 @@ def scan_file(file_path: Path, root: Path) -> list[Finding]:
     except (OSError, UnicodeDecodeError):
         return []
 
-    findings: list[Finding] = []
     relative_path = str(file_path.relative_to(root)) if root.is_dir() else file_path.name
-
+    findings: list[Finding] = []
     for line_number, line in enumerate(content.splitlines(), start=1):
         lowered = line.lower()
         for rule in RULES:
@@ -169,7 +171,6 @@ def scan_file(file_path: Path, root: Path) -> list[Finding]:
                     recommendation=rule["recommendation"],
                 )
             )
-
     return deduplicate_findings(findings)
 
 
@@ -182,8 +183,7 @@ def deduplicate_findings(findings: Iterable[Finding]) -> list[Finding]:
     unique: list[Finding] = []
     for finding in findings:
         key = (finding.rule_id, finding.file_path, finding.line)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(finding)
+        if key not in seen:
+            seen.add(key)
+            unique.append(finding)
     return unique
