@@ -52,6 +52,16 @@ DANGEROUS_SHELL = re.compile(
 FILESYSTEM_ROOT = re.compile(
     r"(?i)(allowed_paths|filesystem_roots|mounts|roots|sandbox_root).{0,60}['\"]/(?:['\"]|\s*[\],}])"
 )
+UNPINNED_REMOTE_EXEC = re.compile(
+    r"(?i)(?:^|[\s'\"\[(,=])(npx|uvx|bunx|pnpm\s+dlx|pipx\s+run)\s+[-@a-z0-9]"
+)
+TOOL_AUTO_APPROVAL = re.compile(
+    r"(?i)(auto[_-]?approve|always[_-]?allow|auto[_-]?execute|auto[_-]?run[_-]?tools|approve[_-]?all[_-]?tools|dangerously[_-]?skip[_-]?permissions|yolo[_-]?mode)"
+)
+BIND_ALL_INTERFACES = re.compile(
+    r"(?i)((host|hostname|bind|bind_host|address|listen)\s*[:=]\s*['\"]?(0\.0\.0\.0|::)['\"]?"
+    r"|--(host|bind)[= ]\s*['\"]?0\.0\.0\.0)"
+)
 PLACEHOLDER_HINTS = (
     "your_api_key",
     "example",
@@ -60,6 +70,15 @@ PLACEHOLDER_HINTS = (
     "replace_me",
     "dummy",
     "sample",
+)
+# A pinned invocation names an exact version, digest, or locked revision.
+PINNED_VERSION = re.compile(
+    r"(?i)(@\d[\w.\-]*|@sha256:[0-9a-f]{7,}|==\s*\d[\w.\-]*|--rev[= ]\s*[0-9a-f]{7,})"
+)
+UNPINNED_TAGS = ("@latest", "@next", "@canary", "@beta", "@dev")
+DISABLED_AUTO_APPROVAL = re.compile(
+    r"(?i)(auto[_-]?approve|always[_-]?allow|auto[_-]?execute|auto[_-]?run[_-]?tools)"
+    r"\s*[:=]\s*(\[\s*\]|false|off|no|0|none|null)\b"
 )
 
 RULES = (
@@ -102,6 +121,32 @@ RULES = (
         "pattern": FILESYSTEM_ROOT,
         "message": "Filesystem exposure includes the host root directory.",
         "recommendation": "Restrict filesystem access to explicit project-scoped paths.",
+    },
+    {
+        "rule_id": "MPG006",
+        "title": "unpinned remote package execution",
+        "severity": "high",
+        "pattern": UNPINNED_REMOTE_EXEC,
+        "message": "MCP server is launched from an unpinned remote package, so a compromised or"
+        " republished release executes with the agent's privileges.",
+        "recommendation": "Pin the exact version or digest (for example package@1.4.2) or vendor the server locally.",
+    },
+    {
+        "rule_id": "MPG007",
+        "title": "tool calls auto-approved",
+        "severity": "high",
+        "pattern": TOOL_AUTO_APPROVAL,
+        "message": "Tool invocations are approved without a human in the loop, so prompt injection"
+        " reaches side-effecting tools directly.",
+        "recommendation": "Remove blanket auto-approval; allow only read-only tools and require confirmation for writes.",
+    },
+    {
+        "rule_id": "MPG008",
+        "title": "server bound to all network interfaces",
+        "severity": "medium",
+        "pattern": BIND_ALL_INTERFACES,
+        "message": "Binding to 0.0.0.0 exposes a local-trust MCP server to the whole network.",
+        "recommendation": "Bind to 127.0.0.1 for local use, or add authentication and TLS before exposing it.",
     },
 )
 
@@ -159,6 +204,10 @@ def scan_file(file_path: Path, root: Path) -> list[Finding]:
                 continue
             if rule["rule_id"] == "MPG001" and looks_like_placeholder(lowered):
                 continue
+            if rule["rule_id"] == "MPG006" and looks_pinned(lowered):
+                continue
+            if rule["rule_id"] == "MPG007" and auto_approval_is_disabled(line):
+                continue
             findings.append(
                 Finding(
                     rule_id=rule["rule_id"],
@@ -176,6 +225,18 @@ def scan_file(file_path: Path, root: Path) -> list[Finding]:
 
 def looks_like_placeholder(lowered_line: str) -> bool:
     return any(hint in lowered_line for hint in PLACEHOLDER_HINTS)
+
+
+def looks_pinned(lowered_line: str) -> bool:
+    """True when a remote execution names an exact version, digest, or revision."""
+    if any(tag in lowered_line for tag in UNPINNED_TAGS):
+        return False
+    return bool(PINNED_VERSION.search(lowered_line))
+
+
+def auto_approval_is_disabled(line: str) -> bool:
+    """True when the auto-approval switch is explicitly empty, false, or none."""
+    return bool(DISABLED_AUTO_APPROVAL.search(line))
 
 
 def deduplicate_findings(findings: Iterable[Finding]) -> list[Finding]:
