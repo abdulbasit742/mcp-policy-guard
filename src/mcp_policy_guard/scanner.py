@@ -52,8 +52,10 @@ DANGEROUS_SHELL = re.compile(
 FILESYSTEM_ROOT = re.compile(
     r"(?i)(allowed_paths|filesystem_roots|mounts|roots|sandbox_root).{0,60}['\"]/(?:['\"]|\s*[\],}])"
 )
+# Runner tokens appear bare in shell scripts and quoted inside MCP client JSON,
+# so only a leading delimiter is required here; pinning is checked separately.
 UNPINNED_REMOTE_EXEC = re.compile(
-    r"(?i)(?:^|[\s'\"\[(,=])(npx|uvx|bunx|pnpm\s+dlx|pipx\s+run)\s+[-@a-z0-9]"
+    r"(?i)(?:^|[\s'\"\[(,=])(npx|uvx|bunx|pnpm\s+dlx|pipx\s+run)\b"
 )
 TOOL_AUTO_APPROVAL = re.compile(
     r"(?i)(auto[_-]?approve|always[_-]?allow|auto[_-]?execute|auto[_-]?run[_-]?tools|approve[_-]?all[_-]?tools|dangerously[_-]?skip[_-]?permissions|yolo[_-]?mode)"
@@ -78,7 +80,7 @@ PINNED_VERSION = re.compile(
 UNPINNED_TAGS = ("@latest", "@next", "@canary", "@beta", "@dev")
 DISABLED_AUTO_APPROVAL = re.compile(
     r"(?i)(auto[_-]?approve|always[_-]?allow|auto[_-]?execute|auto[_-]?run[_-]?tools)"
-    r"\s*[:=]\s*(\[\s*\]|false|off|no|0|none|null)\b"
+    r"['\"]?\s*[:=]\s*(?:\[\s*\]|(?:false|off|no|0|none|null)\b)"
 )
 
 RULES = (
