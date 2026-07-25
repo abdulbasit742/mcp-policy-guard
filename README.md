@@ -9,6 +9,9 @@ It detects practical trust-boundary mistakes before they ship:
 - authentication explicitly disabled
 - dangerous shell execution primitives
 - broad filesystem-root exposure
+- unpinned remote package execution (`npx`/`uvx`/`bunx` without a version or digest)
+- tool calls auto-approved with no human in the loop
+- servers bound to all network interfaces (`0.0.0.0`)
 
 Version 0.2 adds auditable, expiring suppressions and SARIF 2.1.0 output without adding runtime dependencies or network access.
 
@@ -110,6 +113,12 @@ Only active findings influence exit code 1. Suppressed findings remain visible i
 | `MPG003` | high | authentication explicitly disabled |
 | `MPG004` | medium | dangerous shell execution primitives |
 | `MPG005` | medium | broad filesystem-root exposure |
+| `MPG006` | high | unpinned remote package execution (`npx`, `uvx`, `bunx`, `pnpm dlx`, `pipx run`) |
+| `MPG007` | high | tool calls auto-approved (`autoApprove`, `alwaysAllow`, skip-permissions flags) |
+| `MPG008` | medium | server bound to all interfaces (`0.0.0.0`, `::`) |
+
+`MPG006` accepts an exact version, digest, or locked revision (`server@1.4.2`, `server@sha256:...`) and still
+flags floating tags such as `@latest`. `MPG007` ignores switches that are explicitly empty, `false`, or `none`.
 
 ## Example text output
 
@@ -135,7 +144,7 @@ python -m mcp_policy_guard scan . --fail-on critical
 python -m mcp_policy_guard scan . --format sarif --fail-on critical > report.sarif
 ```
 
-The current suite contains 15 regression tests covering scanner behavior, stable fingerprints, policy validation, expiry boundaries, exact-match suppression, stale entries, CLI exit codes, and SARIF serialization. CI runs on Python 3.10–3.13 with read-only repository permissions.
+The current suite contains 23 regression tests covering scanner behavior, stable fingerprints, policy validation, expiry boundaries, exact-match suppression, stale entries, CLI exit codes, SARIF serialization, and the MCP supply-chain rules. CI runs on Python 3.10-3.13 with read-only repository permissions.
 
 ## Design references
 
